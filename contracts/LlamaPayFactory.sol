@@ -48,7 +48,7 @@ contract LlamaPayFactory {
     function getLlamaPayContractByToken(address _token) external view returns(address predictedAddress, bool isDeployed){
         predictedAddress = address(uint160(uint256(keccak256(abi.encodePacked(
             bytes1(0xff),
-            address(this),
+            uint256(address(this)),
             bytes32(uint256(uint160(_token))),
             INIT_CODEHASH
         )))));

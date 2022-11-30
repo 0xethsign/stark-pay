@@ -1,8 +1,8 @@
 //SPDX-License-Identifier: None
 pragma solidity ^0.8.0;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "./IERC20.sol";
+import {ERC20} from "./ERC20.sol";
 // import {BoringBatchable} from "./fork/BoringBatchable.sol";
 
 interface Factory {
@@ -28,8 +28,6 @@ interface IERC20WithDecimals {
 // Another assumption is that all timestamps can fit in uint40, this will be true until year 231,800, so it's a safe assumption
 
 contract LlamaPay {
-    using ERC20 for IERC20;
-
     struct Payer {
         uint40 lastPayerUpdate;
         uint216 totalPaidPerSec; // uint216 is enough to hold 1M streams of 3e51 tokens/yr, which is enough
@@ -41,14 +39,14 @@ contract LlamaPay {
     IERC20 public token;
     uint public DECIMALS_DIVISOR;
 
-    event StreamCreated(address indexed from, address indexed to, uint216 amountPerSec, bytes32 streamId);
-    event StreamCreatedWithReason(address indexed from, address indexed to, uint216 amountPerSec, bytes32 streamId, string reason);
-    event StreamCancelled(address indexed from, address indexed to, uint216 amountPerSec, bytes32 streamId);
-    event StreamPaused(address indexed from, address indexed to, uint216 amountPerSec, bytes32 streamId);
-    event StreamModified(address indexed from, address indexed oldTo, uint216 oldAmountPerSec, bytes32 oldStreamId, address indexed to, uint216 amountPerSec, bytes32 newStreamId);
-    event Withdraw(address indexed from, address indexed to, uint216 amountPerSec, bytes32 streamId, uint amount);
-    event PayerDeposit(address indexed from, uint amount);
-    event PayerWithdraw(address indexed from, uint amount);
+    event StreamCreated(address  from, address  to, uint216 amountPerSec, bytes32 streamId);
+    event StreamCreatedWithReason(address  from, address  to, uint216 amountPerSec, bytes32 streamId, string reason);
+    event StreamCancelled(address  from, address  to, uint216 amountPerSec, bytes32 streamId);
+    event StreamPaused(address  from, address  to, uint216 amountPerSec, bytes32 streamId);
+    event StreamModified(address  from, address  oldTo, uint216 oldAmountPerSec, bytes32 oldStreamId, address  to, uint216 amountPerSec, bytes32 newStreamId);
+    event Withdraw(address  from, address  to, uint216 amountPerSec, bytes32 streamId, uint amount);
+    event PayerDeposit(address  from, uint amount);
+    event PayerWithdraw(address  from, uint amount);
 
     constructor(){
         token = IERC20(Factory(msg.sender).parameter());
@@ -57,7 +55,10 @@ contract LlamaPay {
     }
 
     function getStreamId(address from, address to, uint216 amountPerSec) public pure returns (bytes32){
-        return keccak256(abi.encodePacked(from, to, amountPerSec));
+	uint256 f = uint256(from);
+	uint256 t = uint256(to);
+
+        return keccak256(abi.encodePacked(f, t, amountPerSec));
     }
 
     function _createStream(address to, uint216 amountPerSec) internal returns (bytes32 streamId){
@@ -181,7 +182,7 @@ contract LlamaPay {
         (uint40 lastUpdate, bytes32 streamId, uint amountToTransfer) = _withdraw(from, to, amountPerSec);
         streamToStart[streamId] = lastUpdate;
         payers[from].lastPayerUpdate = lastUpdate;
-        token.safeTransfer(to, amountToTransfer);
+        token.transfer(to, amountToTransfer);
     }
 
     function _cancelStream(address to, uint216 amountPerSec) internal returns (bytes32 streamId) {
@@ -194,7 +195,7 @@ contract LlamaPay {
             payer.totalPaidPerSec -= amountPerSec;
         }
         payer.lastPayerUpdate = lastUpdate;
-        token.safeTransfer(to, amountToTransfer);
+        token.transfer(to, amountToTransfer);
     }
 
     function cancelStream(address to, uint216 amountPerSec) public {
@@ -216,7 +217,7 @@ contract LlamaPay {
 
     function deposit(uint amount) public {
         balances[msg.sender] += amount * DECIMALS_DIVISOR;
-        token.safeTransferFrom(msg.sender, address(this), amount);
+        token.transferFrom(msg.sender, address(this), amount);
         emit PayerDeposit(msg.sender, amount);
     }
 
@@ -237,7 +238,7 @@ contract LlamaPay {
         unchecked {
             require(balances[msg.sender] >= delta*uint(payer.totalPaidPerSec), "pls no rug");
             uint tokenAmount = amount/DECIMALS_DIVISOR;
-            token.safeTransfer(msg.sender, tokenAmount);
+            token.transfer(msg.sender, tokenAmount);
             emit PayerWithdraw(msg.sender, tokenAmount);
         }
     }
